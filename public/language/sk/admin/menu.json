@@ -1,5 +1,9 @@
 {
-	"dashboard": "Dashboard",
+	"section-dashboard": "Dashboards",
+	"dashboard/overview": "Overview",
+	"dashboard/logins": "Logins",
+	"dashboard/users": "Users",
+	"dashboard/topics": "Topics",
 	"section-general": "Všeobecné",
 
 	"section-manage": "Spravovať",
@@ -31,6 +35,7 @@
 	"settings/pagination": "Stránkovanie",
 	"settings/tags": "Značky",
 	"settings/notifications": "Oznámenia",
+	"settings/api": "API Access",
 	"settings/sounds": "Sounds",
 	"settings/social": "Social",
 	"settings/cookies": "Coockie",
@@ -70,7 +75,7 @@
 	"logout": "Odhlásiť",
 	"view-forum": "Zobraziť fórum",
 
-	"search.placeholder": "Hľadať nastavenia",
+	"search.placeholder": "Press &quot;/&quot; to search for settings",
 	"search.no-results": "Žiadne výsledky...",
 	"search.search-forum": "Prehľadať fórum pre <strong></strong>",
 	"search.keep-typing": "Píšte viac pre zobrazenie výsledkov...",

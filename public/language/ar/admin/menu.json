@@ -1,5 +1,9 @@
 {
-	"dashboard": "Dashboard",
+	"section-dashboard": "Dashboards",
+	"dashboard/overview": "Overview",
+	"dashboard/logins": "Logins",
+	"dashboard/users": "Users",
+	"dashboard/topics": "Topics",
 	"section-general": "عام",
 
 	"section-manage": "إدارة",
@@ -31,6 +35,7 @@
 	"settings/pagination": "ترقيم الصفحات",
 	"settings/tags": "الكلمات المفتاحية",
 	"settings/notifications": "التنبيهات",
+	"settings/api": "API Access",
 	"settings/sounds": "Sounds",
 	"settings/social": "Social",
 	"settings/cookies": "Cookies",
@@ -70,7 +75,7 @@
 	"logout": "Log out",
 	"view-forum": "View Forum",
 
-	"search.placeholder": "Search for settings",
+	"search.placeholder": "Press &quot;/&quot; to search for settings",
 	"search.no-results": "No results...",
 	"search.search-forum": "Search the forum for <strong></strong>",
 	"search.keep-typing": "Type more to see results...",

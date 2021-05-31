@@ -5,7 +5,7 @@ const os = require('os');
 const nconf = require('nconf');
 
 const pubsub = require('../pubsub');
-const utils = require('../utils');
+const slugify = require('../slugify');
 
 const Meta = module.exports;
 
@@ -15,7 +15,6 @@ Meta.configs = require('./configs');
 Meta.themes = require('./themes');
 Meta.js = require('./js');
 Meta.css = require('./css');
-Meta.sounds = require('./sounds');
 Meta.settings = require('./settings');
 Meta.logs = require('./logs');
 Meta.errors = require('./errors');
@@ -30,7 +29,7 @@ Meta.languages = require('./languages');
 Meta.userOrGroupExists = async function (slug) {
 	const user = require('../user');
 	const groups = require('../groups');
-	slug = utils.slugify(slug);
+	slug = slugify(slug);
 	const [userExists, groupExists] = await Promise.all([
 		user.existsBySlug(slug),
 		groups.existsBySlug(slug),
@@ -39,7 +38,7 @@ Meta.userOrGroupExists = async function (slug) {
 };
 
 if (nconf.get('isPrimary')) {
-	pubsub.on('meta:restart', function (data) {
+	pubsub.on('meta:restart', (data) => {
 		if (data.hostname !== os.hostname()) {
 			restart();
 		}
@@ -62,9 +61,9 @@ function restart() {
 }
 
 Meta.getSessionTTLSeconds = function () {
-	var ttlDays = 60 * 60 * 24 * Meta.config.loginDays;
-	var ttlSeconds = Meta.config.loginSeconds;
-	var ttl = ttlSeconds || ttlDays || 1209600; // Default to 14 days
+	const ttlDays = 60 * 60 * 24 * Meta.config.loginDays;
+	const ttlSeconds = Meta.config.loginSeconds;
+	const ttl = ttlSeconds || ttlDays || 1209600; // Default to 14 days
 	return ttl;
 };
 

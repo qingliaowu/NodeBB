@@ -1,6 +1,5 @@
 'use strict';
 
-const path = require('path');
 const semver = require('semver');
 const async = require('async');
 const winston = require('winston');
@@ -8,11 +7,12 @@ const nconf = require('nconf');
 const _ = require('lodash');
 
 const meta = require('../meta');
+const { themeNamePattern } = require('../constants');
 
 module.exports = function (Plugins) {
 	async function registerPluginAssets(pluginData, fields) {
 		function add(dest, arr) {
-			dest.push.apply(dest, arr || []);
+			dest.push(...(arr || []));
 		}
 
 		const handlers = {
@@ -37,17 +37,14 @@ module.exports = function (Plugins) {
 			modules: function (next) {
 				Plugins.data.getModules(pluginData, next);
 			},
-			soundpack: function (next) {
-				Plugins.data.getSoundpack(pluginData, next);
-			},
 			languageData: function (next) {
 				Plugins.data.getLanguageData(pluginData, next);
 			},
 		};
 
-		var methods = {};
+		let methods = {};
 		if (Array.isArray(fields)) {
-			fields.forEach(function (field) {
+			fields.forEach((field) => {
 				methods[field] = handlers[field];
 			});
 		} else {
@@ -63,9 +60,6 @@ module.exports = function (Plugins) {
 		add(Plugins.clientScripts, results.clientScripts);
 		add(Plugins.acpScripts, results.acpScripts);
 		Object.assign(meta.js.scripts.modules, results.modules || {});
-		if (results.soundpack) {
-			Plugins.soundpacks.push(results.soundpack);
-		}
 		if (results.languageData) {
 			Plugins.languageData.languages = _.union(Plugins.languageData.languages, results.languageData.languages);
 			Plugins.languageData.namespaces = _.union(Plugins.languageData.namespaces, results.languageData.namespaces);
@@ -81,7 +75,6 @@ module.exports = function (Plugins) {
 			'admin js bundle': ['acpScripts'],
 			'client side styles': ['cssFiles', 'lessFiles'],
 			'admin control panel styles': ['cssFiles', 'lessFiles', 'acpLessFiles'],
-			sounds: ['soundpack'],
 			languages: ['languageData'],
 		};
 
@@ -97,9 +90,6 @@ module.exports = function (Plugins) {
 				case 'acpLessFiles':
 					Plugins[field].length = 0;
 					break;
-				case 'soundpack':
-					Plugins.soundpacks.length = 0;
-					break;
 				case 'languageData':
 					Plugins.languageData.languages = [];
 					Plugins.languageData.namespaces = [];
@@ -108,12 +98,10 @@ module.exports = function (Plugins) {
 			}
 		});
 
-		winston.verbose('[plugins] loading the following fields from plugin data: ' + fields.join(', '));
+		winston.verbose(`[plugins] loading the following fields from plugin data: ${fields.join(', ')}`);
 		const plugins = await Plugins.data.getActive();
 		await Promise.all(plugins.map(p => registerPluginAssets(p, fields)));
 	};
-
-	const themeNamePattern = /(@.*?\/)?nodebb-theme-.*$/;
 
 	Plugins.loadPlugin = async function (pluginPath) {
 		let pluginData;
@@ -132,10 +120,10 @@ module.exports = function (Plugins) {
 
 		try {
 			registerHooks(pluginData);
-			await registerPluginAssets(pluginData, ['soundpack']);
+			await registerPluginAssets(pluginData);
 		} catch (err) {
 			winston.error(err.stack);
-			winston.verbose('[plugins] Could not load plugin : ' + pluginData.id);
+			winston.verbose(`[plugins] Could not load plugin : ${pluginData.id}`);
 			return;
 		}
 
@@ -146,7 +134,7 @@ module.exports = function (Plugins) {
 			});
 		}
 
-		winston.verbose('[plugins] Loaded plugin: ' + pluginData.id);
+		winston.verbose(`[plugins] Loaded plugin: ${pluginData.id}`);
 	};
 
 	function checkVersion(pluginData) {
@@ -166,22 +154,16 @@ module.exports = function (Plugins) {
 	}
 
 	function registerHooks(pluginData) {
-		if (!pluginData.library) {
-			return;
-		}
-
-		const libraryPath = path.join(pluginData.path, pluginData.library);
-
 		try {
 			if (!Plugins.libraries[pluginData.id]) {
-				Plugins.requireLibrary(pluginData.id, libraryPath);
+				Plugins.requireLibrary(pluginData);
 			}
 
 			if (Array.isArray(pluginData.hooks)) {
-				pluginData.hooks.forEach(hook => Plugins.registerHook(pluginData.id, hook));
+				pluginData.hooks.forEach(hook => Plugins.hooks.register(pluginData.id, hook));
 			}
 		} catch (err) {
-			winston.warn('[plugins] Unable to parse library for: ' + pluginData.id);
+			winston.warn(`[plugins] Unable to load library for: ${pluginData.id}`);
 			throw err;
 		}
 	}

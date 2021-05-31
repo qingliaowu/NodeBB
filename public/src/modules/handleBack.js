@@ -15,6 +15,8 @@ define('handleBack', [
 		$(window).off('action:popstate', onBackClicked).on('action:popstate', onBackClicked);
 	};
 
+	handleBack.onBackClicked = onBackClicked;
+
 	function saveClickedIndex() {
 		$('[component="category"]').on('click', '[component="topic/header"]', function () {
 			var clickedIndex = $(this).parents('[data-index]').attr('data-index');
@@ -30,8 +32,14 @@ define('handleBack', [
 		});
 	}
 
-	function onBackClicked() {
-		if ((ajaxify.data.template.category || ajaxify.data.template.recent)) {
+	function onBackClicked(isMarkedUnread) {
+		var highlightUnread = isMarkedUnread && ajaxify.data.template.unread;
+		if (
+			ajaxify.data.template.category ||
+			ajaxify.data.template.recent ||
+			ajaxify.data.template.popular ||
+			highlightUnread
+		) {
 			var bookmarkIndex = storage.getItem('category:bookmark');
 			var clickedIndex = storage.getItem('category:bookmark:clicked');
 

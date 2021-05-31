@@ -5,6 +5,8 @@
 	"maintenance-mode.message": "維護訊息",
 	"headers": "標題",
 	"headers.allow-from": "設定 ALLOW-FROM 來放置 NodeBB 於 iFrame 中",
+	"headers.csp-frame-ancestors": "Set Content-Security-Policy frame-ancestors header to Place NodeBB in an iFrame",
+	"headers.csp-frame-ancestors-help": "'none', 'self'(default) or list of URIs to allow.",
 	"headers.powered-by": "自訂由 NodeBB 發送的 \"Powered By\" 標頭 ",
 	"headers.acao": "Access-Control-Allow-Origin",
 	"headers.acao-regex": "Access-Control-Allow-Origin 正規表示法",
@@ -30,5 +32,12 @@
 	"sockets.settings": "WebSocket 設定",
 	"sockets.max-attempts": "最大重連次數",
 	"sockets.default-placeholder": "預設: %1",
-	"sockets.delay": "重新連線延遲時間"
+	"sockets.delay": "重新連線延遲時間",
+
+	"analytics.settings": "Analytics Settings",
+	"analytics.max-cache": "Analytics Cache Max Value",
+	"analytics.max-cache-help": "On high-traffic installs, the cache could be exhausted continuously if there are more concurrent active users than the Max Cache value. (Restart required)",
+	"compression.settings": "Compression Settings",
+	"compression.enable": "Enable Compression",
+	"compression.help": "This setting enables gzip compression. For a high-traffic website in production, the best way to put compression in place is to implement it at a reverse proxy level. You can enable it here for testing purposes."
 }

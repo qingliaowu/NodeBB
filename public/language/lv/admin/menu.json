@@ -1,5 +1,9 @@
 {
-	"dashboard": "Dashboard",
+	"section-dashboard": "Dashboards",
+	"dashboard/overview": "Overview",
+	"dashboard/logins": "Logins",
+	"dashboard/users": "Users",
+	"dashboard/topics": "Topics",
 	"section-general": "Vispārējie",
 
 	"section-manage": "Pārvaldīt",
@@ -31,6 +35,7 @@
 	"settings/pagination": "Dalīšana pa lapām",
 	"settings/tags": "Birkas",
 	"settings/notifications": "Paziņojumi",
+	"settings/api": "API Access",
 	"settings/sounds": "Sounds",
 	"settings/social": "Social",
 	"settings/cookies": "Sīkfaili",
@@ -70,7 +75,7 @@
 	"logout": "Izlogoties",
 	"view-forum": "Uz forumu",
 
-	"search.placeholder": "Meklēt iestatījumos",
+	"search.placeholder": "Press &quot;/&quot; to search for settings",
 	"search.no-results": "Nav rezultātu...",
 	"search.search-forum": "Forumā meklēt <strong></strong>",
 	"search.keep-typing": "Rakstīt vairāk, lai redzētu rezultātus...",

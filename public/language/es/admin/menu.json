@@ -1,5 +1,9 @@
 {
-	"dashboard": "Dashboard",
+	"section-dashboard": "Dashboards",
+	"dashboard/overview": "Overview",
+	"dashboard/logins": "Logins",
+	"dashboard/users": "Users",
+	"dashboard/topics": "Topics",
 	"section-general": "General",
 
 	"section-manage": "Administrar",
@@ -31,6 +35,7 @@
 	"settings/pagination": "Paginación",
 	"settings/tags": "Etiquetas",
 	"settings/notifications": "Notificaciones",
+	"settings/api": "API Access",
 	"settings/sounds": "Sounds",
 	"settings/social": "Social",
 	"settings/cookies": "Cookies",
@@ -70,7 +75,7 @@
 	"logout": "Cerrar sesión",
 	"view-forum": "Ver foro",
 
-	"search.placeholder": "Buscar configuraciones",
+	"search.placeholder": "Press &quot;/&quot; to search for settings",
 	"search.no-results": "Sin resultados...",
 	"search.search-forum": "Buscar en el foro <strong></strong>",
 	"search.keep-typing": "Escribe más para ver resultados...",

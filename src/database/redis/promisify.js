@@ -4,6 +4,7 @@ const util = require('util');
 
 module.exports = function (redisClient) {
 	redisClient.async = {
+		quit: util.promisify(redisClient.quit).bind(redisClient),
 		send_command: util.promisify(redisClient.send_command).bind(redisClient),
 
 		exists: util.promisify(redisClient.exists).bind(redisClient),
@@ -19,6 +20,8 @@ module.exports = function (redisClient) {
 		expireat: util.promisify(redisClient.expireat).bind(redisClient),
 		pexpire: util.promisify(redisClient.pexpire).bind(redisClient),
 		pexpireat: util.promisify(redisClient.pexpireat).bind(redisClient),
+		ttl: util.promisify(redisClient.ttl).bind(redisClient),
+		pttl: util.promisify(redisClient.pttl).bind(redisClient),
 
 		hmset: util.promisify(redisClient.hmset).bind(redisClient),
 		hset: util.promisify(redisClient.hset).bind(redisClient),

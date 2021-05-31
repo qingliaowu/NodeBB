@@ -17,7 +17,7 @@ module.exports = function (SocketUser) {
 			throw new Error('[[error:invalid-data]]');
 		}
 
-		const type = data.type;
+		const { type } = data;
 		let picture = '';
 		await user.isAdminOrGlobalModOrSelf(socket.uid, data.uid);
 		if (type === 'default') {
@@ -25,7 +25,7 @@ module.exports = function (SocketUser) {
 		} else if (type === 'uploaded') {
 			picture = await user.getUserField(data.uid, 'uploadedpicture');
 		} else {
-			const returnData = await plugins.fireHook('filter:user.getPicture', {
+			const returnData = await plugins.hooks.fire('filter:user.getPicture', {
 				uid: socket.uid,
 				type: type,
 				picture: undefined,
@@ -33,7 +33,16 @@ module.exports = function (SocketUser) {
 			picture = returnData && returnData.picture;
 		}
 
-		await user.setUserField(data.uid, 'picture', picture);
+		const validBackgrounds = await user.getIconBackgrounds(socket.uid);
+		if (!validBackgrounds.includes(data.bgColor)) {
+			data.bgColor = validBackgrounds[0];
+		}
+
+		await user.updateProfile(socket.uid, {
+			uid: data.uid,
+			picture: picture,
+			'icon:bgColor': data.bgColor,
+		}, ['picture', 'icon:bgColor']);
 	};
 
 	SocketUser.removeUploadedPicture = async function (socket, data) {
@@ -53,7 +62,7 @@ module.exports = function (SocketUser) {
 			// if current picture is uploaded picture, reset to user icon
 			picture: userData.uploadedpicture === userData.picture ? '' : userData.picture,
 		});
-		plugins.fireHook('action:user.removeUploadedPicture', {
+		plugins.hooks.fire('action:user.removeUploadedPicture', {
 			callerUid: socket.uid,
 			uid: data.uid,
 			user: userData,
@@ -66,7 +75,7 @@ module.exports = function (SocketUser) {
 		}
 
 		const [list, uploaded] = await Promise.all([
-			plugins.fireHook('filter:user.listPictures', {
+			plugins.hooks.fire('filter:user.listPictures', {
 				uid: data.uid,
 				pictures: [],
 			}),

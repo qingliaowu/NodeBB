@@ -7,12 +7,15 @@ const nconf = require('nconf');
 const os = require('os');
 const cproc = require('child_process');
 const util = require('util');
+const request = require('request-promise-native');
 
 const db = require('../database');
 const meta = require('../meta');
 const pubsub = require('../pubsub');
+const { paths } = require('../constants');
 
-const supportedPackageManagerList = require('../cli/package-install').supportedPackageManager; // load config from src/cli/package-install.js
+const supportedPackageManagerList = require('../cli/package-install').supportedPackageManager;
+// load config from src/cli/package-install.js
 const packageManager = supportedPackageManagerList.indexOf(nconf.get('package_manager')) >= 0 ? nconf.get('package_manager') : 'npm';
 let packageManagerExecutable = packageManager;
 const packageManagerCommands = {
@@ -40,13 +43,13 @@ if (process.platform === 'win32') {
 
 module.exports = function (Plugins) {
 	if (nconf.get('isPrimary')) {
-		pubsub.on('plugins:toggleInstall', function (data) {
+		pubsub.on('plugins:toggleInstall', (data) => {
 			if (data.hostname !== os.hostname()) {
 				toggleInstall(data.id, data.version);
 			}
 		});
 
-		pubsub.on('plugins:upgrade', function (data) {
+		pubsub.on('plugins:upgrade', (data) => {
 			if (data.hostname !== os.hostname()) {
 				upgrade(data.id, data.version);
 			}
@@ -62,8 +65,22 @@ module.exports = function (Plugins) {
 			await db.sortedSetAdd('plugins:active', count, id);
 		}
 		meta.reloadRequired = true;
-		Plugins.fireHook(isActive ? 'action:plugin.deactivate' : 'action:plugin.activate', { id: id });
+		Plugins.hooks.fire(isActive ? 'action:plugin.deactivate' : 'action:plugin.activate', { id: id });
 		return { id: id, active: !isActive };
+	};
+
+	Plugins.checkWhitelist = async function (id, version) {
+		const body = await request({
+			method: 'GET',
+			url: `https://packages.nodebb.org/api/v1/plugins/${encodeURIComponent(id)}`,
+			json: true,
+		});
+
+		if (body && body.code === 'ok' && (version === 'latest' || body.payload.valid.includes(version))) {
+			return;
+		}
+
+		throw new Error('[[error:plugin-not-whitelisted]]');
 	};
 
 	Plugins.toggleInstall = async function (id, version) {
@@ -84,21 +101,21 @@ module.exports = function (Plugins) {
 		}
 		await runPackageManagerCommandAsync(type, id, version || 'latest');
 		const pluginData = await Plugins.get(id);
-		Plugins.fireHook('action:plugin.' + type, { id: id, version: version });
+		Plugins.hooks.fire(`action:plugin.${type}`, { id: id, version: version });
 		return pluginData;
 	}
 
 	function runPackageManagerCommand(command, pkgName, version, callback) {
 		cproc.execFile(packageManagerExecutable, [
 			packageManagerCommands[packageManager][command],
-			pkgName + (command === 'install' ? '@' + version : ''),
+			pkgName + (command === 'install' ? `@${version}` : ''),
 			'--save',
-		], function (err, stdout) {
+		], (err, stdout) => {
 			if (err) {
 				return callback(err);
 			}
 
-			winston.verbose('[plugins/' + command + '] ' + stdout);
+			winston.verbose(`[plugins/${command}] ${stdout}`);
 			callback();
 		});
 	}
@@ -117,7 +134,7 @@ module.exports = function (Plugins) {
 	}
 
 	Plugins.isInstalled = async function (id) {
-		const pluginDir = path.join(__dirname, '../../node_modules', id);
+		const pluginDir = path.join(paths.nodeModules, id);
 		try {
 			const stats = await fs.promises.stat(pluginDir);
 			return stats.isDirectory();

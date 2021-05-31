@@ -26,9 +26,7 @@ module.exports = function (module) {
  				WHERE o."_key" = ANY($1::TEXT[])`,
 				values: [key],
 			});
-			return key.map(function (k) {
-				return res.rows.some(r => r.k === k);
-			});
+			return key.map(k => res.rows.some(r => r.k === k));
 		}
 		const res =	await module.pool.query({
 			name: 'exists',
@@ -43,12 +41,12 @@ module.exports = function (module) {
 	};
 
 	module.scan = async function (params) {
-		let match = params.match;
+		let { match } = params;
 		if (match.startsWith('*')) {
-			match = '%' + match.substring(1);
+			match = `%${match.substring(1)}`;
 		}
 		if (match.endsWith('*')) {
-			match = match.substring(0, match.length - 1) + '%';
+			match = `${match.substring(0, match.length - 1)}%`;
 		}
 
 		const res = await module.pool.query({
@@ -115,7 +113,7 @@ SELECT s."data" t
 			return;
 		}
 
-		await module.transaction(async function (client) {
+		await module.transaction(async (client) => {
 			await helpers.ensureLegacyObjectType(client, key, 'string');
 			await client.query({
 				name: 'set',
@@ -134,7 +132,7 @@ DO UPDATE SET "data" = $2::TEXT`,
 			return;
 		}
 
-		return await module.transaction(async function (client) {
+		return await module.transaction(async (client) => {
 			await helpers.ensureLegacyObjectType(client, key, 'string');
 			const res = await client.query({
 				name: 'increment',
@@ -151,7 +149,7 @@ RETURNING "data" d`,
 	};
 
 	module.rename = async function (oldKey, newKey) {
-		await module.transaction(async function (client) {
+		await module.transaction(async (client) => {
 			await client.query({
 				name: 'deleteRename',
 				text: `
@@ -209,5 +207,27 @@ UPDATE "legacy_object"
 
 	module.pexpireAt = async function (key, timestamp) {
 		await doExpire(key, new Date(timestamp));
+	};
+
+	async function getExpire(key) {
+		const res = await module.pool.query({
+			name: 'ttl',
+			text: `
+SELECT "expireAt"::TEXT
+  FROM "legacy_object"
+ WHERE "_key" = $1::TEXT
+ LIMIT 1`,
+			values: [key],
+		});
+
+		return res.rows.length ? new Date(res.rows[0].expireAt).getTime() : null;
+	}
+
+	module.ttl = async function (key) {
+		return Math.round((await getExpire(key) - Date.now()) / 1000);
+	};
+
+	module.pttl = async function (key) {
+		return await getExpire(key) - Date.now();
 	};
 };

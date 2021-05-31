@@ -6,6 +6,7 @@
 	"assignee": "Toegekend aan",
 	"update": "Bijwerken",
 	"updated": "Bijgewerkt",
+	"resolved": "Resolved",
 	"target-purged": "De inhoud waar deze markering naar verwijst is verwijderd en niet meer beschikbaar.",
 
 	"graph-label": "Dagelijkse markeringen",
@@ -26,6 +27,7 @@
 	"filter-cid-all": "Alle categorieën",
 	"apply-filters": "Filters toepassen",
 	"more-filters": "Meer filters",
+	"fewer-filters": "Fewer Filters",
 
 	"quick-actions": "Snelle acties",
 	"flagged-user": "Gemarkeerde gebruiker",
@@ -67,7 +69,7 @@
 	"sort-upvotes": "Most upvotes",
 	"sort-replies": "Most replies",
 
-	"modal-title": "Rapporteer ongepaste content",
+	"modal-title": "Report Content",
 	"modal-body": "Beschrijf de reden voor het markeren van %1 %2 voor review. Of gebruik een van de snelknoppen indien van toepassing.",
 	"modal-reason-spam": "Spam",
 	"modal-reason-offensive": "Aanstootgevend",
@@ -81,5 +83,6 @@
 
 	"bulk-actions": "Bulk acties",
 	"bulk-resolve": "Los markering(en) op",
-	"bulk-success": "%1 markeringen aangepast"
+	"bulk-success": "%1 markeringen aangepast",
+	"flagged-timeago-readable": "Flagged <span class=\"timeago\" title=\"%1\"></span> (%2)"
 }

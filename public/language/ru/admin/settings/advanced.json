@@ -5,6 +5,8 @@
 	"maintenance-mode.message": "Сообщение для пользователей",
 	"headers": "Заголовки",
 	"headers.allow-from": "Опция ALLOW-FROM для использования NodeBB через iFrame",
+	"headers.csp-frame-ancestors": "Set Content-Security-Policy frame-ancestors header to Place NodeBB in an iFrame",
+	"headers.csp-frame-ancestors-help": "'none', 'self'(default) or list of URIs to allow.",
 	"headers.powered-by": "Настройка заголовка «Powered By», отправляемого NodeBB",
 	"headers.acao": "Access-Control-Allow-Origin",
 	"headers.acao-regex": "Регулярное выражение для Access-Control-Allow-Origin",
@@ -30,5 +32,12 @@
 	"sockets.settings": "Настройки протокола WebSocket",
 	"sockets.max-attempts": "Макс. попыток переподключения",
 	"sockets.default-placeholder": "По умолчанию: %1",
-	"sockets.delay": "Задержка"
+	"sockets.delay": "Задержка",
+
+	"analytics.settings": "Analytics Settings",
+	"analytics.max-cache": "Analytics Cache Max Value",
+	"analytics.max-cache-help": "On high-traffic installs, the cache could be exhausted continuously if there are more concurrent active users than the Max Cache value. (Restart required)",
+	"compression.settings": "Compression Settings",
+	"compression.enable": "Enable Compression",
+	"compression.help": "This setting enables gzip compression. For a high-traffic website in production, the best way to put compression in place is to implement it at a reverse proxy level. You can enable it here for testing purposes."
 }

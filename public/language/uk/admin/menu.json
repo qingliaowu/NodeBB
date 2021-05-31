@@ -1,5 +1,9 @@
 {
-	"dashboard": "Dashboard",
+	"section-dashboard": "Dashboards",
+	"dashboard/overview": "Overview",
+	"dashboard/logins": "Logins",
+	"dashboard/users": "Users",
+	"dashboard/topics": "Topics",
 	"section-general": "Загальні",
 
 	"section-manage": "Керування",
@@ -31,6 +35,7 @@
 	"settings/pagination": "Пагінація",
 	"settings/tags": "Теги",
 	"settings/notifications": "Сповіщення",
+	"settings/api": "API Access",
 	"settings/sounds": "Sounds",
 	"settings/social": "Social",
 	"settings/cookies": "Куки",
@@ -70,7 +75,7 @@
 	"logout": "Вийти",
 	"view-forum": "Переглянути форум",
 
-	"search.placeholder": "Пошук налаштувань",
+	"search.placeholder": "Press &quot;/&quot; to search for settings",
 	"search.no-results": "Без результатів...",
 	"search.search-forum": "Шукати на форумі <strong></strong>",
 	"search.keep-typing": "Для результатів, надрукуйте ще...",

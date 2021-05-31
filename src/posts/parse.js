@@ -1,28 +1,26 @@
 'use strict';
 
-var nconf = require('nconf');
-var url = require('url');
-var winston = require('winston');
+const nconf = require('nconf');
+const url = require('url');
+const winston = require('winston');
 const sanitize = require('sanitize-html');
 const _ = require('lodash');
 
-var meta = require('../meta');
-var plugins = require('../plugins');
-var translator = require('../translator');
-var utils = require('../utils');
+const meta = require('../meta');
+const plugins = require('../plugins');
+const translator = require('../translator');
+const utils = require('../utils');
 
 let sanitizeConfig = {
 	allowedTags: sanitize.defaults.allowedTags.concat([
 		// Some safe-to-use tags to add
-		'span', 'a', 'pre', 'small',
-		'sup', 'sub', 'u', 'del',
+		'sup', 'ins', 'del', 'img', 'button',
 		'video', 'audio', 'iframe', 'embed',
-		'img', 'tfoot', 'h1', 'h2',
-		's', 'button', 'i',
+		// 'sup' still necessary until https://github.com/apostrophecms/sanitize-html/pull/422 merged
 	]),
 	allowedAttributes: {
 		...sanitize.defaults.allowedAttributes,
-		a: ['href', 'hreflang', 'media', 'rel', 'target', 'type'],
+		a: ['href', 'name', 'hreflang', 'media', 'rel', 'target', 'type'],
 		img: ['alt', 'height', 'ismap', 'src', 'usemap', 'width', 'srcset'],
 		iframe: ['height', 'name', 'src', 'width'],
 		video: ['autoplay', 'controls', 'height', 'loop', 'muted', 'poster', 'preload', 'src', 'width'],
@@ -59,13 +57,12 @@ module.exports = function (Posts) {
 		const cachedContent = cache.get(pid);
 		if (postData.pid && cachedContent !== undefined) {
 			postData.content = cachedContent;
-			cache.hits += 1;
 			return postData;
 		}
-		cache.misses += 1;
-		const data = await plugins.fireHook('filter:parse.post', { postData: postData });
+
+		const data = await plugins.hooks.fire('filter:parse.post', { postData: postData });
 		data.postData.content = translator.escape(data.postData.content);
-		if (global.env === 'production' && data.postData.pid) {
+		if (data.postData.pid) {
 			cache.set(pid, data.postData.content);
 		}
 		return data.postData;
@@ -73,7 +70,7 @@ module.exports = function (Posts) {
 
 	Posts.parseSignature = async function (userData, uid) {
 		userData.signature = sanitizeSignature(userData.signature || '');
-		return await plugins.fireHook('filter:parse.signature', { userData: userData, uid: uid });
+		return await plugins.hooks.fire('filter:parse.signature', { userData: userData, uid: uid });
 	};
 
 	Posts.relativeToAbsolute = function (content, regex) {
@@ -81,9 +78,9 @@ module.exports = function (Posts) {
 		if (!content) {
 			return content;
 		}
-		var parsed;
-		var current = regex.regex.exec(content);
-		var absolute;
+		let parsed;
+		let current = regex.regex.exec(content);
+		let absolute;
 		while (current !== null) {
 			if (current[1]) {
 				try {
@@ -94,10 +91,12 @@ module.exports = function (Posts) {
 							absolute = nconf.get('base_url') + current[1];
 						} else {
 							// External link
-							absolute = '//' + current[1];
+							absolute = `//${current[1]}`;
 						}
 
-						content = content.slice(0, current.index + regex.length) + absolute + content.slice(current.index + regex.length + current[1].length);
+						content = content.slice(0, current.index + regex.length) +
+						absolute +
+						content.slice(current.index + regex.length + current[1].length);
 					}
 				} catch (err) {
 					winston.verbose(err.messsage);
@@ -120,16 +119,47 @@ module.exports = function (Posts) {
 	Posts.configureSanitize = async () => {
 		// Each allowed tags should have some common global attributes...
 		sanitizeConfig.allowedTags.forEach((tag) => {
-			sanitizeConfig.allowedAttributes[tag] = _.union(sanitizeConfig.allowedAttributes[tag], sanitizeConfig.globalAttributes);
+			sanitizeConfig.allowedAttributes[tag] = _.union(
+				sanitizeConfig.allowedAttributes[tag],
+				sanitizeConfig.globalAttributes
+			);
 		});
 
 		// Some plugins might need to adjust or whitelist their own tags...
-		sanitizeConfig = await plugins.fireHook('filter:sanitize.config', sanitizeConfig);
+		sanitizeConfig = await plugins.hooks.fire('filter:sanitize.config', sanitizeConfig);
+	};
+
+	Posts.registerHooks = () => {
+		plugins.hooks.register('core', {
+			hook: 'filter:parse.post',
+			method: async (data) => {
+				data.postData.content = Posts.sanitize(data.postData.content);
+				return data;
+			},
+		});
+
+		plugins.hooks.register('core', {
+			hook: 'filter:parse.raw',
+			method: async content => Posts.sanitize(content),
+		});
+
+		plugins.hooks.register('core', {
+			hook: 'filter:parse.aboutme',
+			method: async content => Posts.sanitize(content),
+		});
+
+		plugins.hooks.register('core', {
+			hook: 'filter:parse.signature',
+			method: async (data) => {
+				data.userData.signature = Posts.sanitize(data.userData.signature);
+				return data;
+			},
+		});
 	};
 
 	function sanitizeSignature(signature) {
 		signature = translator.escape(signature);
-		var tagsToStrip = [];
+		const tagsToStrip = [];
 
 		if (meta.config['signatures:disableLinks']) {
 			tagsToStrip.push('a');

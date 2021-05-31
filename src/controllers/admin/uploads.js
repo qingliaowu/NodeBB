@@ -2,7 +2,6 @@
 
 const path = require('path');
 const nconf = require('nconf');
-const mime = require('mime');
 const fs = require('fs');
 
 const meta = require('../../meta');
@@ -27,14 +26,14 @@ uploadsController.get = async function (req, res, next) {
 		let files = await fs.promises.readdir(currentFolder);
 		files = files.filter(filename => filename !== '.gitignore');
 		const itemCount = files.length;
-		var start = Math.max(0, (page - 1) * itemsPerPage);
-		var stop = start + itemsPerPage;
+		const start = Math.max(0, (page - 1) * itemsPerPage);
+		const stop = start + itemsPerPage;
 		files = files.slice(start, stop);
 
 		files = await filesToData(currentFolder, files);
 
 		// Float directories to the top
-		files.sort(function (a, b) {
+		files.sort((a, b) => {
 			if (a.isDirectory && !b.isDirectory) {
 				return -1;
 			} else if (!a.isDirectory && b.isDirectory) {
@@ -47,9 +46,9 @@ uploadsController.get = async function (req, res, next) {
 		});
 
 		// Add post usage info if in /files
-		if (req.query.dir === '/files') {
+		if (['/files', '/files/'].includes(req.query.dir)) {
 			const usage = await posts.uploads.getUsage(files);
-			files.forEach(function (file, idx) {
+			files.forEach((file, idx) => {
 				file.inPids = usage[idx].map(pid => parseInt(pid, 10));
 			});
 		}
@@ -66,16 +65,16 @@ uploadsController.get = async function (req, res, next) {
 };
 
 function buildBreadcrumbs(currentFolder) {
-	var crumbs = [];
-	var parts = currentFolder.replace(nconf.get('upload_path'), '').split(path.sep);
-	var currentPath = '';
-	parts.forEach(function (part) {
-		var dir = path.join(currentPath, part);
+	const crumbs = [];
+	const parts = currentFolder.replace(nconf.get('upload_path'), '').split(path.sep);
+	let currentPath = '';
+	parts.forEach((part) => {
+		const dir = path.join(currentPath, part);
 		crumbs.push({
 			text: part || 'Uploads',
 			url: part ?
-				(nconf.get('relative_path') + '/admin/manage/uploads?dir=' + dir) :
-				nconf.get('relative_path') + '/admin/manage/uploads',
+				(`${nconf.get('relative_path')}/admin/manage/uploads?dir=${dir}`) :
+				`${nconf.get('relative_path')}/admin/manage/uploads`,
 		});
 		currentPath = dir;
 	});
@@ -93,14 +92,14 @@ async function getFileData(currentDir, file) {
 	if (stat.isDirectory()) {
 		filesInDir = await fs.promises.readdir(path.join(currentDir, file));
 	}
-	const url = nconf.get('upload_url') + currentDir.replace(nconf.get('upload_path'), '') + '/' + file;
+	const url = `${nconf.get('upload_url') + currentDir.replace(nconf.get('upload_path'), '')}/${file}`;
 	return {
 		name: file,
 		path: path.join(currentDir, file).replace(nconf.get('upload_path'), ''),
 		url: url,
 		fileCount: Math.max(0, filesInDir.length - 1), // ignore .gitignore
 		size: stat.size,
-		sizeHumanReadable: (stat.size / 1024).toFixed(1) + 'KiB',
+		sizeHumanReadable: `${(stat.size / 1024).toFixed(1)}KiB`,
 		isDirectory: stat.isDirectory(),
 		isFile: stat.isFile(),
 		mtime: stat.mtimeMs,
@@ -119,7 +118,7 @@ uploadsController.uploadCategoryPicture = async function (req, res, next) {
 	}
 
 	if (validateUpload(res, uploadedFile, allowedImageTypes)) {
-		const filename = 'category-' + params.cid + path.extname(uploadedFile.name);
+		const filename = `category-${params.cid}${path.extname(uploadedFile.name)}`;
 		await uploadImage(filename, 'category', uploadedFile, req, res, next);
 	}
 };
@@ -153,7 +152,7 @@ uploadsController.uploadTouchIcon = async function (req, res, next) {
 				/* eslint-disable no-await-in-loop */
 				await image.resizeImage({
 					path: uploadedFile.path,
-					target: path.join(nconf.get('upload_path'), 'system', 'touchicon-' + size + '.png'),
+					target: path.join(nconf.get('upload_path'), 'system', `touchicon-${size}.png`),
 					width: size,
 					height: size,
 				});
@@ -167,26 +166,25 @@ uploadsController.uploadTouchIcon = async function (req, res, next) {
 	}
 };
 
-uploadsController.uploadLogo = async function (req, res, next) {
-	await upload('site-logo', req, res, next);
+
+uploadsController.uploadMaskableIcon = async function (req, res, next) {
+	const uploadedFile = req.files.files[0];
+	const allowedTypes = ['image/png'];
+
+	if (validateUpload(res, uploadedFile, allowedTypes)) {
+		try {
+			const imageObj = await file.saveFileToLocal('maskableicon-orig.png', 'system', uploadedFile.path);
+			res.json([{ name: uploadedFile.name, url: imageObj.url }]);
+		} catch (err) {
+			next(err);
+		} finally {
+			file.delete(uploadedFile.path);
+		}
+	}
 };
 
-uploadsController.uploadSound = async function (req, res, next) {
-	const uploadedFile = req.files.files[0];
-
-	const mimeType = mime.getType(uploadedFile.name);
-	if (!/^audio\//.test(mimeType)) {
-		return next(Error('[[error:invalid-data]]'));
-	}
-	try {
-		await file.saveFileToLocal(uploadedFile.name, 'sounds', uploadedFile.path);
-		await meta.sounds.build();
-		res.json([{}]);
-	} catch (err) {
-		next(err);
-	} finally {
-		file.delete(uploadedFile.path);
-	}
+uploadsController.uploadLogo = async function (req, res, next) {
+	await upload('site-logo', req, res, next);
 };
 
 uploadsController.uploadFile = async function (req, res, next) {
@@ -229,7 +227,7 @@ async function upload(name, req, res, next) {
 function validateUpload(res, uploadedFile, allowedTypes) {
 	if (!allowedTypes.includes(uploadedFile.type)) {
 		file.delete(uploadedFile.path);
-		res.json({ error: '[[error:invalid-image-type, ' + allowedTypes.join('&#44; ') + ']]' });
+		res.json({ error: `[[error:invalid-image-type, ${allowedTypes.join('&#44; ')}]]` });
 		return false;
 	}
 
@@ -239,8 +237,8 @@ function validateUpload(res, uploadedFile, allowedTypes) {
 async function uploadImage(filename, folder, uploadedFile, req, res, next) {
 	let imageData;
 	try {
-		if (plugins.hasListeners('filter:uploadImage')) {
-			imageData = await plugins.fireHook('filter:uploadImage', { image: uploadedFile, uid: req.uid, folder: folder });
+		if (plugins.hooks.hasListeners('filter:uploadImage')) {
+			imageData = await plugins.hooks.fire('filter:uploadImage', { image: uploadedFile, uid: req.uid, folder: folder });
 		} else {
 			imageData = await file.saveFileToLocal(filename, folder, uploadedFile.path);
 		}

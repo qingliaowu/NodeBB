@@ -1,6 +1,9 @@
 'use strict';
 
 const nconf = require('nconf');
+const winston = require('winston');
+const passport = require('passport');
+const util = require('util');
 
 const meta = require('../meta');
 const user = require('../user');
@@ -8,18 +11,68 @@ const privileges = require('../privileges');
 const plugins = require('../plugins');
 const helpers = require('./helpers');
 const auth = require('../routes/authentication');
+const writeRouter = require('../routes/write');
 
 const controllers = {
 	helpers: require('../controllers/helpers'),
+	authentication: require('../controllers/authentication'),
+};
+
+const passportAuthenticateAsync = function (req, res) {
+	return new Promise((resolve, reject) => {
+		passport.authenticate('core.api', (err, user) => {
+			if (err) {
+				reject(err);
+			} else {
+				resolve(user);
+				res.on('finish', writeRouter.cleanup.bind(null, req));
+			}
+		})(req, res);
+	});
 };
 
 module.exports = function (middleware) {
 	async function authenticate(req, res) {
+		const loginAsync = util.promisify(req.login).bind(req);
+
 		if (req.loggedIn) {
+			// If authenticated via cookie (express-session), protect routes with CSRF checking
+			if (res.locals.isAPI) {
+				await middleware.applyCSRFasync(req, res);
+			}
+
 			return true;
+		} else if (req.headers.hasOwnProperty('authorization')) {
+			const user = await passportAuthenticateAsync(req, res);
+			if (!user) { return true; }
+
+			// If the token received was a master token, a _uid must also be present for all calls
+			if (user.hasOwnProperty('uid')) {
+				await loginAsync(user);
+				await controllers.authentication.onSuccessfulLogin(req, user.uid);
+				req.uid = user.uid;
+				req.loggedIn = req.uid > 0;
+				return true;
+			} else if (user.hasOwnProperty('master') && user.master === true) {
+				if (req.body.hasOwnProperty('_uid') || req.query.hasOwnProperty('_uid')) {
+					user.uid = req.body._uid || req.query._uid;
+					delete user.master;
+
+					await loginAsync(user);
+					await controllers.authentication.onSuccessfulLogin(req, user.uid);
+					req.uid = user.uid;
+					req.loggedIn = req.uid > 0;
+					return true;
+				}
+
+				throw new Error('A master token was received without a corresponding `_uid` in the request body');
+			} else {
+				winston.warn('[api/authenticate] Unable to find user after verifying token');
+				return true;
+			}
 		}
 
-		await plugins.fireHook('response:middleware.authenticate', {
+		await plugins.hooks.fire('response:middleware.authenticate', {
 			req: req,
 			res: res,
 			next: function () {},	// no-op for backwards compatibility
@@ -31,7 +84,8 @@ module.exports = function (middleware) {
 		return !res.headersSent;
 	}
 
-	middleware.authenticate = helpers.try(async function middlewareAuthenticate(req, res, next) {
+	middleware.authenticate = helpers.try(async (req, res, next) => {
+		winston.warn(`[middleware] middleware.authenticate has been deprecated, page and API routes are now automatically authenticated via setup(Page|API)Route. Use middleware.authenticateRequest (if not using route helper) and middleware.ensureLoggedIn instead. (request path: ${req.path})`);
 		if (!await authenticate(req, res)) {
 			return;
 		}
@@ -41,18 +95,24 @@ module.exports = function (middleware) {
 		next();
 	});
 
-	middleware.authenticateOrGuest = helpers.try(async function authenticateOrGuest(req, res, next) {
+	middleware.authenticateRequest = helpers.try(async (req, res, next) => {
 		if (!await authenticate(req, res)) {
 			return;
 		}
 		next();
 	});
 
-	middleware.ensureSelfOrGlobalPrivilege = helpers.try(async function ensureSelfOrGlobalPrivilege(req, res, next) {
+	// TODO: Remove in v1.18.0
+	middleware.authenticateOrGuest = (req, res, next) => {
+		winston.warn(`[middleware] middleware.authenticateOrGuest has been renamed, use middleware.authenticateRequest instead. (request path: ${req.path})`);
+		middleware.authenticateRequest(req, res, next);
+	};
+
+	middleware.ensureSelfOrGlobalPrivilege = helpers.try(async (req, res, next) => {
 		await ensureSelfOrMethod(user.isAdminOrGlobalMod, req, res, next);
 	});
 
-	middleware.ensureSelfOrPrivileged = helpers.try(async function ensureSelfOrPrivileged(req, res, next) {
+	middleware.ensureSelfOrPrivileged = helpers.try(async (req, res, next) => {
 		await ensureSelfOrMethod(user.isPrivileged, req, res, next);
 	});
 
@@ -75,7 +135,7 @@ module.exports = function (middleware) {
 		return next();
 	}
 
-	middleware.canViewUsers = helpers.try(async function canViewUsers(req, res, next) {
+	middleware.canViewUsers = helpers.try(async (req, res, next) => {
 		if (parseInt(res.locals.uid, 10) === req.uid) {
 			return next();
 		}
@@ -86,7 +146,7 @@ module.exports = function (middleware) {
 		controllers.helpers.notAllowed(req, res);
 	});
 
-	middleware.canViewGroups = helpers.try(async function canViewGroups(req, res, next) {
+	middleware.canViewGroups = helpers.try(async (req, res, next) => {
 		const canView = await privileges.global.can('view:groups', req.uid);
 		if (canView) {
 			return next();
@@ -94,14 +154,14 @@ module.exports = function (middleware) {
 		controllers.helpers.notAllowed(req, res);
 	});
 
-	middleware.checkAccountPermissions = helpers.try(async function checkAccountPermissions(req, res, next) {
+	middleware.checkAccountPermissions = helpers.try(async (req, res, next) => {
 		// This middleware ensures that only the requested user and admins can pass
-		if (!await authenticate(req, res)) {
-			return;
-		}
+
+		// This check if left behind for legacy purposes. Older plugins may call this middleware without ensureLoggedIn
 		if (!req.loggedIn) {
 			return controllers.helpers.notAllowed(req, res);
 		}
+
 		const uid = await user.getUidByUserslug(req.params.userslug);
 		let allowed = await privileges.users.canEdit(req.uid, uid);
 		if (allowed) {
@@ -117,15 +177,15 @@ module.exports = function (middleware) {
 		controllers.helpers.notAllowed(req, res);
 	});
 
-	middleware.redirectToAccountIfLoggedIn = helpers.try(async function redirectToAccountIfLoggedIn(req, res, next) {
+	middleware.redirectToAccountIfLoggedIn = helpers.try(async (req, res, next) => {
 		if (req.session.forceLogin || req.uid <= 0) {
 			return next();
 		}
 		const userslug = await user.getUserField(req.uid, 'userslug');
-		controllers.helpers.redirect(res, '/user/' + userslug);
+		controllers.helpers.redirect(res, `/user/${userslug}`);
 	});
 
-	middleware.redirectUidToUserslug = helpers.try(async function redirectUidToUserslug(req, res, next) {
+	middleware.redirectUidToUserslug = helpers.try(async (req, res, next) => {
 		const uid = parseInt(req.params.uid, 10);
 		if (uid <= 0) {
 			return next();
@@ -134,23 +194,26 @@ module.exports = function (middleware) {
 		if (!userslug) {
 			return next();
 		}
-		const path = req.path.replace(/^\/api/, '')
-			.replace('uid', 'user')
-			.replace(uid, function () { return userslug; });
+		const path = req.url.replace(/^\/api/, '')
+			.replace(`/uid/${uid}`, () => `/user/${userslug}`);
 		controllers.helpers.redirect(res, path);
 	});
 
-	middleware.redirectMeToUserslug = helpers.try(async function redirectMeToUserslug(req, res) {
+	middleware.redirectMeToUserslug = helpers.try(async (req, res) => {
 		const userslug = await user.getUserField(req.uid, 'userslug');
 		if (!userslug) {
 			return controllers.helpers.notAllowed(req, res);
 		}
-		const path = req.path.replace(/^(\/api)?\/me/, '/user/' + userslug);
+		const path = req.path.replace(/^(\/api)?\/me/, `/user/${userslug}`);
 		controllers.helpers.redirect(res, path);
 	});
 
-	middleware.isAdmin = helpers.try(async function isAdmin(req, res, next) {
+	middleware.isAdmin = helpers.try(async (req, res, next) => {
+		// TODO: Remove in v1.16.0
+		winston.warn('[middleware] middleware.isAdmin deprecated, use middleware.admin.checkPrivileges instead');
+
 		const isAdmin = await user.isAdministrator(req.uid);
+
 		if (!isAdmin) {
 			return controllers.helpers.notAllowed(req, res);
 		}
@@ -173,16 +236,16 @@ module.exports = function (middleware) {
 
 		let returnTo = req.path;
 		if (nconf.get('relative_path')) {
-			returnTo = req.path.replace(new RegExp('^' + nconf.get('relative_path')), '');
+			returnTo = req.path.replace(new RegExp(`^${nconf.get('relative_path')}`), '');
 		}
 		returnTo = returnTo.replace(/^\/api/, '');
 
 		req.session.returnTo = returnTo;
 		req.session.forceLogin = 1;
 		if (res.locals.isAPI) {
-			res.status(401).json({});
+			controllers.helpers.formatApiResponse(401, res);
 		} else {
-			res.redirect(nconf.get('relative_path') + '/login?local=1');
+			res.redirect(`${nconf.get('relative_path')}/login?local=1`);
 		}
 	});
 
@@ -194,12 +257,17 @@ module.exports = function (middleware) {
 		res.status(403).render('403', { title: '[[global:403.title]]' });
 	};
 
-	middleware.registrationComplete = function registrationComplete(req, res, next) {
+	middleware.registrationComplete = async function registrationComplete(req, res, next) {
 		// If the user's session contains registration data, redirect the user to complete registration
 		if (!req.session.hasOwnProperty('registration')) {
 			return setImmediate(next);
 		}
-		if (!req.path.endsWith('/register/complete')) {
+
+		const path = req.path.startsWith('/api/') ? req.path.replace('/api', '') : req.path;
+		const { allowed } = await plugins.hooks.fire('filter:middleware.registrationComplete', {
+			allowed: ['/register/complete'],
+		});
+		if (!allowed.includes(path)) {
 			// Append user data if present
 			req.session.registration.uid = req.uid;
 

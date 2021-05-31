@@ -3,7 +3,8 @@
 define('chat', [
 	'components',
 	'taskbar',
-], function (components, taskbar) {
+	'translator',
+], function (components, taskbar, translator) {
 	var module = {};
 	var newMessage = false;
 
@@ -20,27 +21,33 @@ define('chat', [
 				return room.teaser;
 			});
 
-			app.parseAndTranslate('partials/chats/dropdown', { rooms: rooms }, function (html) {
-				chatsListEl.find('*').not('.navigation-link').remove();
-				chatsListEl.prepend(html);
-				app.createUserTooltips(chatsListEl, 'right');
-				chatsListEl.off('click').on('click', '[data-roomid]', function (ev) {
-					if ($(ev.target).parents('.user-link').length) {
-						return;
-					}
-					var roomId = $(this).attr('data-roomid');
-					if (!ajaxify.currentPage.match(/^chats\//)) {
-						app.openChat(roomId);
-					} else {
-						ajaxify.go('user/' + app.user.userslug + '/chats/' + roomId);
-					}
-				});
-
-				$('[component="chats/mark-all-read"]').off('click').on('click', function () {
-					socket.emit('modules.chats.markAllRead', function (err) {
-						if (err) {
-							return app.alertError(err);
+			translator.toggleTimeagoShorthand(function () {
+				for (var i = 0; i < rooms.length; i += 1) {
+					rooms[i].teaser.timeago = $.timeago(new Date(parseInt(rooms[i].teaser.timestamp, 10)));
+				}
+				translator.toggleTimeagoShorthand();
+				app.parseAndTranslate('partials/chats/dropdown', { rooms: rooms }, function (html) {
+					chatsListEl.find('*').not('.navigation-link').remove();
+					chatsListEl.prepend(html);
+					app.createUserTooltips(chatsListEl, 'right');
+					chatsListEl.off('click').on('click', '[data-roomid]', function (ev) {
+						if ($(ev.target).parents('.user-link').length) {
+							return;
 						}
+						var roomId = $(this).attr('data-roomid');
+						if (!ajaxify.currentPage.match(/^chats\//)) {
+							app.openChat(roomId);
+						} else {
+							ajaxify.go('user/' + app.user.userslug + '/chats/' + roomId);
+						}
+					});
+
+					$('[component="chats/mark-all-read"]').off('click').on('click', function () {
+						socket.emit('modules.chats.markAllRead', function (err) {
+							if (err) {
+								return app.alertError(err);
+							}
+						});
 					});
 				});
 			});
@@ -49,7 +56,6 @@ define('chat', [
 
 
 	module.onChatMessageReceived = function (data) {
-		var username = data.message.fromUser.username;
 		var isSelf = data.self === 1;
 		data.message.self = data.self;
 
@@ -70,11 +76,7 @@ define('chat', [
 				roomData.silent = true;
 				roomData.uid = app.user.uid;
 				roomData.isSelf = isSelf;
-				module.createModal(roomData, function () {
-					if (!isSelf) {
-						updateTitleAndPlaySound(data.message.mid, username);
-					}
-				});
+				module.createModal(roomData);
 			});
 		}
 	};
@@ -99,7 +101,6 @@ define('chat', [
 			}
 
 			if (!isSelf && (!modal.is(':visible') || !app.isFocused)) {
-				updateTitleAndPlaySound(data.message.mid, username);
 				taskbar.push('chat', modal.attr('data-uuid'), {
 					title: '[[modules:chat.chatting_with]] ' + (data.roomName || username),
 					touid: data.message.fromUser.uid,
@@ -107,13 +108,6 @@ define('chat', [
 					isSelf: false,
 				});
 			}
-		});
-	}
-
-	function updateTitleAndPlaySound(mid, username) {
-		app.alternatingTitle('[[modules:chat.user_has_messaged_you, ' + username + ']]');
-		require(['sounds'], function (sounds) {
-			sounds.play('chat-incoming', 'chat.incoming:' + mid);
 		});
 	}
 

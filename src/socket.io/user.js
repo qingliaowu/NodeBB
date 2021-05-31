@@ -1,13 +1,13 @@
 'use strict';
 
-const async = require('async');
-
 const util = require('util');
+const winston = require('winston');
+
 const sleep = util.promisify(setTimeout);
 
+const api = require('../api');
 const user = require('../user');
 const topics = require('../topics');
-const notifications = require('../notifications');
 const messaging = require('../messaging');
 const plugins = require('../plugins');
 const meta = require('../meta');
@@ -17,7 +17,7 @@ const db = require('../database');
 const userController = require('../controllers/user');
 const privileges = require('../privileges');
 const utils = require('../utils');
-const flags = require('../flags');
+const sockets = require('.');
 
 const SocketUser = module.exports;
 
@@ -29,6 +29,8 @@ require('./user/ban')(SocketUser);
 require('./user/registration')(SocketUser);
 
 SocketUser.exists = async function (socket, data) {
+	sockets.warnDeprecated(socket, 'HEAD /api/v3/users/bySlug/:userslug *AND* HEAD /api/v3/groups/:slug');
+
 	if (!data || !data.username) {
 		throw new Error('[[error:invalid-data]]');
 	}
@@ -36,37 +38,9 @@ SocketUser.exists = async function (socket, data) {
 };
 
 SocketUser.deleteAccount = async function (socket, data) {
-	if (!socket.uid) {
-		throw new Error('[[error:no-privileges]]');
-	}
-	const hasPassword = await user.hasPassword(socket.uid);
-	if (hasPassword) {
-		const ok = await user.isPasswordCorrect(socket.uid, data.password, socket.ip);
-		if (!ok) {
-			throw new Error('[[error:invalid-password]]');
-		}
-	}
-	const isAdmin = await user.isAdministrator(socket.uid);
-	if (isAdmin) {
-		throw new Error('[[error:cant-delete-admin]]');
-	}
-	if (meta.config.allowAccountDelete !== 1) {
-		throw new Error('[[error:no-privileges]]');
-	}
-
-	await flags.resolveFlag('user', socket.uid, socket.uid);
-	const userData = await user.deleteAccount(socket.uid);
-
-	require('./index').server.sockets.emit('event:user_status_change', { uid: socket.uid, status: 'offline' });
-
-	await events.log({
-		type: 'user-delete',
-		uid: socket.uid,
-		targetUid: socket.uid,
-		ip: socket.ip,
-		username: userData.username,
-		email: userData.email,
-	});
+	sockets.warnDeprecated(socket, 'DELETE /api/v3/users/:uid/account');
+	data.uid = socket.uid;
+	await api.users.deleteAccount(socket, data);
 };
 
 SocketUser.emailExists = async function (socket, data) {
@@ -129,7 +103,7 @@ SocketUser.reset.commit = async function (socket, data) {
 	const [uid] = await Promise.all([
 		db.getObjectField('reset:uid', data.code),
 		user.reset.commit(data.code, data.password),
-		plugins.fireHook('action:password.reset', { uid: socket.uid }),
+		plugins.hooks.fire('action:password.reset', { uid: socket.uid }),
 	]);
 
 	await events.log({
@@ -140,12 +114,12 @@ SocketUser.reset.commit = async function (socket, data) {
 
 	const username = await user.getUserField(uid, 'username');
 	const now = new Date();
-	const parsedDate = now.getFullYear() + '/' + (now.getMonth() + 1) + '/' + now.getDate();
+	const parsedDate = `${now.getFullYear()}/${now.getMonth() + 1}/${now.getDate()}`;
 	emailer.send('reset_notify', uid, {
 		username: username,
 		date: parsedDate,
 		subject: '[[email:reset.notify.subject]]',
-	});
+	}).catch(err => winston.error(`[emailer.send] ${err.stack}`));
 };
 
 SocketUser.isFollowing = async function (socket, data) {
@@ -157,59 +131,37 @@ SocketUser.isFollowing = async function (socket, data) {
 };
 
 SocketUser.follow = async function (socket, data) {
-	if (!socket.uid || !data) {
-		throw new Error('[[error:invalid-data]]');
-	}
-
-	await toggleFollow('follow', socket.uid, data.uid);
-	const userData = await user.getUserFields(socket.uid, ['username', 'userslug']);
-	const notifObj = await notifications.create({
-		type: 'follow',
-		bodyShort: '[[notifications:user_started_following_you, ' + userData.username + ']]',
-		nid: 'follow:' + data.uid + ':uid:' + socket.uid,
-		from: socket.uid,
-		path: '/uid/' + data.uid + '/followers',
-		mergeId: 'notifications:user_started_following_you',
-	});
-	if (!notifObj) {
-		return;
-	}
-	notifObj.user = userData;
-	await notifications.push(notifObj, [data.uid]);
+	sockets.warnDeprecated(socket, 'POST /api/v3/users/follow');
+	await api.users.follow(socket, data);
 };
 
 SocketUser.unfollow = async function (socket, data) {
-	if (!socket.uid || !data) {
-		throw new Error('[[error:invalid-data]]');
-	}
-	await toggleFollow('unfollow', socket.uid, data.uid);
+	sockets.warnDeprecated(socket, 'DELETE /api/v3/users/unfollow');
+	await api.users.unfollow(socket, data);
 };
 
-async function toggleFollow(method, uid, theiruid) {
-	await user[method](uid, theiruid);
-	plugins.fireHook('action:user.' + method, {
-		fromUid: uid,
-		toUid: theiruid,
-	});
-}
-
 SocketUser.saveSettings = async function (socket, data) {
-	if (!socket.uid || !data || !data.settings) {
-		throw new Error('[[error:invalid-data]]');
-	}
-	const canEdit = await privileges.users.canEdit(socket.uid, data.uid);
-	if (!canEdit) {
-		throw new Error('[[error:no-privileges]]');
-	}
-	return await user.saveSettings(data.uid, data.settings);
+	sockets.warnDeprecated(socket, 'PUT /api/v3/users/:uid/settings');
+	const settings = await api.users.updateSettings(socket, data);
+	return settings;
 };
 
 SocketUser.setTopicSort = async function (socket, sort) {
-	await user.setSetting(socket.uid, 'topicPostSort', sort);
+	sockets.warnDeprecated(socket, 'PUT /api/v3/users/:uid/setting/topicPostSort');
+	await api.users.updateSetting(socket, {
+		uid: socket.uid,
+		setting: 'topicPostSort',
+		value: sort,
+	});
 };
 
 SocketUser.setCategorySort = async function (socket, sort) {
-	await user.setSetting(socket.uid, 'categoryTopicSort', sort);
+	sockets.warnDeprecated(socket, 'PUT /api/v3/users/:uid/setting/categoryTopicSort');
+	await api.users.updateSetting(socket, {
+		uid: socket.uid,
+		setting: 'categoryTopicSort',
+		value: sort,
+	});
 };
 
 SocketUser.getUnreadCount = async function (socket) {
@@ -242,37 +194,6 @@ SocketUser.getUnreadCounts = async function (socket) {
 	return results;
 };
 
-SocketUser.invite = async function (socket, email) {
-	if (!email || !socket.uid) {
-		throw new Error('[[error:invalid-data]]');
-	}
-
-	const registrationType = meta.config.registrationType;
-	if (registrationType !== 'invite-only' && registrationType !== 'admin-invite-only') {
-		throw new Error('[[error:forum-not-invite-only]]');
-	}
-
-	const isAdmin = await user.isAdministrator(socket.uid);
-	if (registrationType === 'admin-invite-only' && !isAdmin) {
-		throw new Error('[[error:no-privileges]]');
-	}
-
-	const max = meta.config.maximumInvites;
-	email = email.split(',').map(email => email.trim()).filter(Boolean);
-
-	await async.eachSeries(email, async function (email) {
-		let invites = 0;
-		if (max) {
-			invites = await user.getInvitesNumber(socket.uid);
-		}
-		if (!isAdmin && max && invites >= max) {
-			throw new Error('[[error:invite-maximum-met, ' + invites + ', ' + max + ']]');
-		}
-
-		await user.sendInvitationEmail(socket.uid, email);
-	});
-};
-
 SocketUser.getUserByUID = async function (socket, uid) {
 	return await userController.getUserDataByField(socket.uid, 'uid', uid);
 };
@@ -301,8 +222,8 @@ SocketUser.setModerationNote = async function (socket, data) {
 	if (!canEdit) {
 		throw new Error('[[error:no-privileges]]');
 	}
-	await db.sortedSetAdd('uid:' + data.uid + ':moderation:notes', noteData.timestamp, noteData.timestamp);
-	await db.setObject('uid:' + data.uid + ':moderation:note:' + noteData.timestamp, noteData);
+
+	await user.appendModerationNote({ uid: data.uid, noteData });
 };
 
 SocketUser.deleteUpload = async function (socket, data) {
@@ -323,7 +244,7 @@ SocketUser.gdpr.check = async function (socket, data) {
 	if (!isAdmin) {
 		data.uid = socket.uid;
 	}
-	return await db.getObjectField('user:' + data.uid, 'gdpr_consent');
+	return await db.getObjectField(`user:${data.uid}`, 'gdpr_consent');
 };
 
 require('../promisify')(SocketUser);

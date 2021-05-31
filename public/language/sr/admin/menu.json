@@ -1,5 +1,9 @@
 {
-	"dashboard": "Dashboard",
+	"section-dashboard": "Dashboards",
+	"dashboard/overview": "Overview",
+	"dashboard/logins": "Logins",
+	"dashboard/users": "Users",
+	"dashboard/topics": "Topics",
 	"section-general": "Uopšteno",
 
 	"section-manage": "Menadžment",
@@ -31,6 +35,7 @@
 	"settings/pagination": "Pagination",
 	"settings/tags": "Tags",
 	"settings/notifications": "Notifikacije",
+	"settings/api": "API Access",
 	"settings/sounds": "Sounds",
 	"settings/social": "Social",
 	"settings/cookies": "Cookies",
@@ -70,7 +75,7 @@
 	"logout": "Izloguj se",
 	"view-forum": "Pogledaj Forum",
 
-	"search.placeholder": "Search for settings",
+	"search.placeholder": "Press &quot;/&quot; to search for settings",
 	"search.no-results": "Nema rezultata...",
 	"search.search-forum": "Pretraži forum za <strong></strong>",
 	"search.keep-typing": "Ukucaj više da vidiš rezultate",
